@@ -63,6 +63,8 @@ def deployToServer(String environment) {
                 ssh ${DEPLOY_USER}@${DEPLOY_SERVER} << 'ENDSSH'
                 set -e
                 cd ${DEPLOY_PATH}/releases/${BUILD_NUMBER}
+                tar -xzf ${APP_NAME}.tar.gz  # x(추출) z(gzip) f(파일)
+                rm ${APP_NAME}.tar.gz         # 압축 파일 삭제 (공간 절약)
                 export PYENV_ROOT="\$HOME/.pyenv"
                 export PATH="\$PYENV_ROOT/bin:\$PATH"
                 if command -v pyenv 1>/dev/null 2>&1; then
