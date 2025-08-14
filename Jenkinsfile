@@ -76,7 +76,26 @@ def deployToServer(String environment) {
                 fi
                 python3 -m venv venv
                 . venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt
-                nohup . venv/bin/activate && uvicorn main:app --host 0.0.0.0 --port ${APP_PORT} &
+
+                # 포트 ${APP_PORT}를 사용하는 프로세스 종료
+                echo "Checking for existing processes on port ${APP_PORT}..."
+                PORT_PID=\$(lsof -ti:${APP_PORT} 2>/dev/null || true)
+                if [ ! -z "\$PORT_PID" ]; then
+                    echo "Killing process \$PORT_PID on port ${APP_PORT}"
+                    kill -TERM \$PORT_PID || true
+                    sleep 2
+                    # 강제 종료가 필요한 경우
+                    if kill -0 \$PORT_PID 2>/dev/null; then
+                        echo "Force killing process \$PORT_PID"
+                        kill -KILL \$PORT_PID || true
+                    fi
+                else
+                    echo "No process found on port ${APP_PORT}"
+                fi
+
+                # uvicorn을 백그라운드로 실행 (venv Python 직접 사용)
+                nohup ./venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port ${APP_PORT} > uvicorn.log 2>&1 &
+                echo "FastAPI server started on port ${APP_PORT}"
                 ln -sfn ${DEPLOY_PATH}/releases/${BUILD_NUMBER} ${DEPLOY_PATH}/current
                 cd ${DEPLOY_PATH}/releases
                 ls -t | tail -n +6 | xargs -I {} rm -rf {}
