@@ -62,12 +62,11 @@ def deployToServer(String environment) {
                 scp ${APP_NAME}.tar.gz ${DEPLOY_USER}@${DEPLOY_SERVER}:${deployPath}/releases/${BUILD_NUMBER}/
                 ssh ${DEPLOY_USER}@${DEPLOY_SERVER} << 'ENDSSH'
                 set -e
-                cd ${deployPath}/releases/${BUILD_NUMBER}
-                # pyenv로 Python 버전 설치 및 활성화
+                cd ${DEPLOY_PATH}/releases/${BUILD_NUMBER}
                 export PYENV_ROOT="\$HOME/.pyenv"
                 export PATH="\$PYENV_ROOT/bin:\$PATH"
                 if command -v pyenv 1>/dev/null 2>&1; then
-                    eval "\\$(pyenv init -)"
+                    eval "\$(pyenv init -)"
                     pyenv install -s ${PYTHON_VERSION}
                     pyenv local ${PYTHON_VERSION}
                 else
@@ -76,8 +75,8 @@ def deployToServer(String environment) {
                 python3 -m venv venv
                 . venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt
                 nohup . venv/bin/activate && uvicorn main:app --host 0.0.0.0 --port ${APP_PORT} &
-                ln -sfn ${deployPath}/releases/${BUILD_NUMBER} ${deployPath}/current
-                cd ${deployPath}/releases
+                ln -sfn ${DEPLOY_PATH}/releases/${BUILD_NUMBER} ${DEPLOY_PATH}/current
+                cd ${DEPLOY_PATH}/releases
                 ls -t | tail -n +6 | xargs -I {} rm -rf {}
                 echo "Deployment to ${environment} completed!"
 ENDSSH
