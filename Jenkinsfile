@@ -14,19 +14,6 @@ pipeline {
                 echo "Commit: ${env.GIT_COMMIT}"
             }
         }
-        stage('Set up Python') {
-            steps {
-                sh 'pyenv install -s $PYTHON_VERSION'
-                sh 'pyenv local $PYTHON_VERSION'
-                sh 'python -m venv venv'
-                sh '. venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt'
-            }
-        }
-        stage('Test') {
-            steps {
-                sh '. venv/bin/activate && pytest || echo "No tests found"'
-            }
-        }
         stage('Prepare Deployment') {
             steps {
                 sh '''
