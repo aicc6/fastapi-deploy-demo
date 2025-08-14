@@ -63,8 +63,16 @@ def deployToServer(String environment) {
                 ssh ${DEPLOY_USER}@${DEPLOY_SERVER} << 'ENDSSH'
                 set -e
                 cd ${deployPath}/releases/${BUILD_NUMBER}
-                tar -xzf ${APP_NAME}.tar.gz
-                rm ${APP_NAME}.tar.gz
+                # pyenv로 Python 버전 설치 및 활성화
+                export PYENV_ROOT="$HOME/.pyenv"
+                export PATH="$PYENV_ROOT/bin:$PATH"
+                if command -v pyenv 1>/dev/null 2>&1; then
+                    eval "$(pyenv init -)"
+                    pyenv install -s ${PYTHON_VERSION}
+                    pyenv local ${PYTHON_VERSION}
+                else
+                    echo "pyenv가 설치되어 있지 않습니다. Python 기본 버전을 사용합니다."
+                fi
                 python3 -m venv venv
                 . venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt
                 nohup . venv/bin/activate && uvicorn main:app --host 0.0.0.0 --port ${APP_PORT} &
