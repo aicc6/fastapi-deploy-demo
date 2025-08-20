@@ -61,10 +61,11 @@ pipeline {
         // 1. 소스 코드 체크아웃 및 환경 설정
         stage('🔄 Clone Repository & Setup') {
             steps {
+                // 더 간단한 체크아웃 방식 사용
                 script {
-                    // 브랜치 정보 확인
-                    def branchName = params.BRANCH_TO_BUILD ?: env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'develop'
+                    def branchName = params.BRANCH_TO_BUILD ?: env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'main'
 
+                    // refs/heads/ 및 origin/ 제거
                     if (branchName?.startsWith('refs/heads/')) {
                         branchName = branchName.replace('refs/heads/', '')
                     }
@@ -73,23 +74,12 @@ pipeline {
                     }
 
                     echo "🔍 체크아웃할 브랜치: ${branchName}"
-
-                    // Git 체크아웃
-                    checkout([
-                        $class: 'GitSCM',
-                        branches: [[name: "*/${branchName}"]],
-                        userRemoteConfigs: [[
-                            url: "${env.GIT_REPOSITORY_URL}",
-                            credentialsId: ''
-                        ]],
-                        extensions: [
-                            [$class: 'CleanBeforeCheckout'],
-                            [$class: 'CloneOption', depth: 1, shallow: true]
-                        ]
-                    ])
-
-                    echo "✅ Git 체크아웃 완료: ${branchName}"
+                    echo "📂 Git Repository: ${env.GIT_REPOSITORY_URL}"
                 }
+
+                // 간단한 Git 체크아웃
+                git branch: "${params.BRANCH_TO_BUILD ?: 'main'}",
+                    url: "${env.GIT_REPOSITORY_URL}"
 
                 script {
                     echo "🚀 FastAPI 배포 데모 빌드 시작"
@@ -101,6 +91,8 @@ pipeline {
                         script: "git rev-parse --short HEAD",
                         returnStdout: true
                     ).trim()
+
+                    echo "✅ Git 체크아웃 완료"
                 }
 
                 // 환경별 .env 파일 생성
@@ -130,7 +122,7 @@ pipeline {
                             echo "BUILD_TIME=\$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> .env
                             echo "GIT_COMMIT=${env.GIT_COMMIT_SHORT}" >> .env
                             echo "BUILD_NUMBER=${BUILD_NUMBER}" >> .env
-                            echo "APP_PORT=${APP_PORT}" >> .env
+                            echo "APP_PORT=8000" >> .env
                             chmod 644 .env
                             echo "✅ 기본 환경 변수 파일 생성 완료"
                         """
@@ -167,16 +159,22 @@ pipeline {
             steps {
                 script {
                     try {
-                        docker.withRegistry("https://${DOCKER_REGISTRY}", "${DOCKER_CREDENTIALS}") {
-                            def app = docker.image("${DOCKER_IMAGE}:${BUILD_NUMBER}")
-                            app.push("${BUILD_NUMBER}")
+                        // Docker 레지스트리가 설정되어 있고 로컬이 아닌 경우에만 푸시
+                        if (env.DOCKER_REGISTRY && env.DOCKER_REGISTRY != 'localhost' && env.DOCKER_REGISTRY != 'local') {
+                            docker.withRegistry("https://${DOCKER_REGISTRY}", "${DOCKER_CREDENTIALS}") {
+                                def app = docker.image("${DOCKER_IMAGE}:${BUILD_NUMBER}")
+                                app.push("${BUILD_NUMBER}")
 
-                            // main 브랜치는 latest 태그도 푸시
-                            def currentBranch = env.GIT_BRANCH ?: 'develop'
-                            if (currentBranch.contains('main')) {
-                                app.push("latest")
-                                echo "✅ latest 태그 푸시 완료"
+                                // main 브랜치는 latest 태그도 푸시
+                                def currentBranch = env.GIT_BRANCH ?: 'develop'
+                                if (currentBranch.contains('main')) {
+                                    app.push("latest")
+                                    echo "✅ latest 태그 푸시 완료"
+                                }
                             }
+                            echo "✅ Docker 이미지 푸시 성공: ${DOCKER_IMAGE}:${BUILD_NUMBER}"
+                        } else {
+                            echo "ℹ️ 로컬 Docker 이미지 사용, 원격 레지스트리 푸시 스킵"
                         }
 
                         env.DOCKER_PUSH_SUCCESS = 'true'
@@ -215,8 +213,13 @@ pipeline {
                             echo "✅ 네트워크 ${dockerNetwork} 존재 확인"
                         fi
 
-                        # 새 이미지 다운로드
-                        docker pull ${DOCKER_IMAGE}:${BUILD_NUMBER}
+                        # 원격 레지스트리에서 이미지 다운로드 (로컬이 아닌 경우)
+                        if [[ "${DOCKER_REGISTRY}" != "localhost" && "${DOCKER_REGISTRY}" != "local" ]]; then
+                            echo "📥 원격 이미지 다운로드: ${DOCKER_IMAGE}:${BUILD_NUMBER}"
+                            docker pull ${DOCKER_IMAGE}:${BUILD_NUMBER}
+                        else
+                            echo "ℹ️ 로컬 Docker 이미지 사용"
+                        fi
 
                         # 기존 컨테이너 중지 및 삭제
                         docker stop ${containerName} || true
