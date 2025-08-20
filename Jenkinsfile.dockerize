@@ -206,38 +206,36 @@ pipeline {
                     echo "📦 이미지: ${DOCKER_IMAGE}:${BUILD_NUMBER}"
 
                     sh """
-                        ssh -o StrictHostKeyChecking=no sl@${env.DEPLOY_SERVER} -p ${env.DEPLOY_SERVER_PORT} '
-                            # Docker 네트워크 확인 및 생성
-                            echo "🌐 Docker 네트워크 확인: ${dockerNetwork}"
-                            if ! docker network ls | grep -q ${dockerNetwork}; then
-                                echo "🔧 네트워크 ${dockerNetwork} 생성 중..."
-                                docker network create ${dockerNetwork} || echo "네트워크 생성 실패 (이미 존재하거나 권한 부족)"
-                            else
-                                echo "✅ 네트워크 ${dockerNetwork} 존재 확인"
-                            fi
+                        # Docker 네트워크 확인 및 생성
+                        echo "🌐 Docker 네트워크 확인: ${dockerNetwork}"
+                        if ! docker network ls | grep -q ${dockerNetwork}; then
+                            echo "🔧 네트워크 ${dockerNetwork} 생성 중..."
+                            docker network create ${dockerNetwork} || echo "네트워크 생성 실패 (이미 존재하거나 권한 부족)"
+                        else
+                            echo "✅ 네트워크 ${dockerNetwork} 존재 확인"
+                        fi
 
-                            # 새 이미지 다운로드
-                            docker pull ${DOCKER_IMAGE}:${BUILD_NUMBER}
+                        # 새 이미지 다운로드
+                        docker pull ${DOCKER_IMAGE}:${BUILD_NUMBER}
 
-                            # 기존 컨테이너 중지 및 삭제
-                            docker stop ${containerName} || true
-                            docker rm ${containerName} || true
+                        # 기존 컨테이너 중지 및 삭제
+                        docker stop ${containerName} || true
+                        docker rm ${containerName} || true
 
-                            # 새 컨테이너 실행
-                            docker run -d \\
-                                --name ${containerName} \\
-                                --network ${dockerNetwork} \\
-                                --restart unless-stopped \\
-                                --label "app=fastapi-deploy-demo" \\
-                                --health-cmd="curl -f http://localhost:8000/ || exit 1" \\
-                                --health-interval=30s \\
-                                --health-timeout=10s \\
-                                --health-retries=3 \\
-                                ${DOCKER_IMAGE}:${BUILD_NUMBER}
+                        # 새 컨테이너 실행
+                        docker run -d \\
+                            --name ${containerName} \\
+                            --network ${dockerNetwork} \\
+                            --restart unless-stopped \\
+                            --label "app=fastapi-deploy-demo" \\
+                            --health-cmd="curl -f http://localhost:8000/ || exit 1" \\
+                            --health-interval=30s \\
+                            --health-timeout=10s \\
+                            --health-retries=3 \\
+                            ${DOCKER_IMAGE}:${BUILD_NUMBER}
 
-                            # 이전 이미지 정리 (선택사항)
-                            docker image prune -f
-                        '
+                        # 이전 이미지 정리 (선택사항)
+                        docker image prune -f
                     """
                 }
             }
