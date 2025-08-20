@@ -107,7 +107,7 @@ pipeline {
                 script {
                     def currentBranch = env.GIT_BRANCH ?: 'develop'
                     def envType = currentBranch.contains('main') ? 'production' : 'development'
-                    def credentialsId = "fastapi-demo-env-${envType}"
+                    def credentialsId = "fastapi-demo-env"
 
                     echo "� 환경 설정: ${envType}"
 
